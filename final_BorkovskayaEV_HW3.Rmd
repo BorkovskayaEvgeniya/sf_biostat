@@ -1,0 +1,246 @@
+---
+title: "HW3"
+author: "Borkovskaya Evgeniya"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(readxl)
+```
+
+## Домашнее задание 3
+
+## Расчет описательных статистик
+
+```{r data load, include=TRUE}
+#загружаем данные
+pima <- read_excel("data/pima.xlsx")
+head(pima)
+```
+
+```{r NA, include=TRUE}
+#смотрим количество пропущенных значений в данных
+sum(is.na(pima))
+```
+
+В первых двух заданиях вам необходимо посчитать описательные статистики. Для количественной переменной рассчитайте число наблюдений, среднее, стандартное отклонение, 1-й и 3-й квартили, минимум и максимум. Для категориальной переменной определите абсолютную и относительные частоты.
+
+### Задание 1
+
+Рассчитайте описательные статистики для переменных `glucose`, `pressure`, `mass`. — 1 балл
+
+#### *Для всех трех величин присутствуют нулевые значения, которые не могут соответствовать указанным параметрам, поэтому не будем учитывать эти значения в описательной статистике.*
+
+```{r task1 descr,include=TRUE}
+
+# Описательная статистика для glucose
+descr_glucose <- pima %>%
+  filter(glucose != 0) %>%
+  summarise(
+    Count = n(),
+    Mean_Glucose = mean(glucose),
+    SD_Glucose = sd(glucose),
+    Q1_Glucose = quantile(glucose, 0.25),
+    Q3_Glucose = quantile(glucose, 0.75),
+    Min_Glucose = min(glucose),
+    Max_Glucose = max(glucose),
+  )
+
+# Описательная статистика для pressure
+descr_pressure <- pima %>%
+  filter(pressure != 0) %>%
+  summarise(
+    Count = n(),
+    Mean_Pressure = mean(pressure),
+    SD_Pressure = sd(pressure),
+    Q1_Pressure = quantile(pressure, 0.25),
+    Q3_Pressure = quantile(pressure, 0.75),
+    Min_Pressure = min(pressure),
+    Max_Pressure = max(pressure),
+  )
+
+# Описательная статистика для mass
+descr_mass <- pima %>%
+  filter(mass != 0) %>%
+  summarise(
+    Count = n(),
+    Mean_Mass = mean(mass),
+    SD_Mass = sd(mass),
+    Q1_Mass = quantile(mass, 0.25),
+    Q3_Mass = quantile(mass, 0.75),
+    Min_Mass = min(mass),
+    Max_Mass = max(mass),
+  )
+
+# Вывод результатов
+descr_glucose
+descr_pressure
+descr_mass
+```
+
+### Задание 2
+
+Рассчитайте описательную статистику для переменной `diabetes`. Создайте на основе переменной `age` новую переменную `age_group`, которая будет отражать следующие возрастные группы: 21–35, 36–49 и 50+. Посчитайте описательную статистику для новой переменной. — 1 балл
+
+```{r task2,include=TRUE}
+
+# Преобразование diabetes в фактор и создание переменной age_group
+pima <- pima %>%
+  mutate(
+    diabetes = factor(diabetes),
+    age_group = cut(age,
+                    breaks = c(20, 35, 49, Inf),
+                    labels = c("21-35", "36-49", "50+"))
+  )
+
+# Описательная статистика для diabetes
+descr_diabetes <- pima %>%
+  group_by(diabetes) %>%
+  summarise(Absolute_Frequency = n()) %>%
+  mutate(Relative_Frequency = round(Absolute_Frequency / sum(Absolute_Frequency), 3))
+
+# Описательная статистика для age_group
+descr_age_group <- pima %>%
+  group_by(age_group) %>%
+  summarise(Absolute_Frequency = n()) %>%
+  mutate(Relative_Frequency = round(Absolute_Frequency / sum(Absolute_Frequency), 3))
+
+# Вывод результатов
+descr_age_group
+descr_diabetes
+```
+
+### Задание 3
+
+Определите 90% доверительный интервал для переменной `pedigree`. — 2 балла
+
+Формула ДИ:
+
+$CI_{100 \%(1 - \alpha)} = \bar {X} \pm t_{df, \frac {\alpha}{2}} * \frac {S}{\sqrt{n}}$
+
+```{r, include=TRUE}
+#Расчет по формуле
+mean_pedigree <- mean(pima$pedigree)
+sd_pedigree <- sd(pima$pedigree)
+se_pedigree <- sd_pedigree / sqrt(length(pima$pedigree))
+
+alpha <- 0.1
+df <- length(pima$pedigree) - 1
+t <- qt(alpha / 2,
+        df,
+        lower.tail = F)
+
+CI_pedigree <- c(mean_pedigree - t * se_pedigree,
+               mean_pedigree + t * se_pedigree)
+CI_pedigree
+```
+
+```{r, include=TRUE}
+#Проверка результата с помощью t.test
+t.test(pima$pedigree, conf.level = 0.90)$conf.int
+```
+
+### Задание 4
+
+Постройте график плотности вероятности для переменной `glucose` и отметьте на нем среднее значение. Для той же переменной постройте гистограмму. Постройте два ящика с усами для значений `pos` и `neg` соответственно переменной `diabetes`. — 3 балла
+
+#### *У переменной glucose есть нулевые значения, которые не могут соответствовать указанному параметру, поэтому не будем учитывать эти значения для расчета среднего и визуального анализа.*
+
+```{r, include=TRUE}
+# Подготовка данных, исключем нулевые значения в glucose
+pima_modified <- pima %>%
+  mutate(glucose = if_else(glucose == 0, NA_real_, glucose)) %>%
+  drop_na()   
+```
+
+```{r, include=TRUE}
+# Расчет среднего значения glucose для использования в подписи
+mean_glucose <- mean(pima_modified$glucose)
+
+# Гистограмма для Glucose с отметкой среднего значения и подписью
+ggplot(pima_modified, aes(x = glucose)) +
+  geom_histogram(binwidth = 10, color = "black", fill = "#5F9EA0", alpha = 0.5) +
+  geom_vline(xintercept = mean_glucose, color = "red", linetype = "dashed", size = 1) +
+  annotate("text", x = mean_glucose, y = Inf, label = paste("Mean:", round(mean_glucose, 2)), 
+           vjust = 2, color = "black", size = 3.5, angle = 90, hjust = 1) +
+  labs(title = "Histogram for Glucose with Mean Value",
+       x = "Glucose Level",
+       y = "Count") +
+  theme_minimal()
+
+
+# График плотности для Glucose с отметкой среднего значения
+ggplot(pima_modified, aes(x = glucose)) +
+  geom_density(fill = "#5F9EA0", alpha = 0.5) +
+  geom_vline(xintercept = mean_glucose, color = "red", linetype = "dashed", size = 1) +
+  annotate("text", x = mean_glucose, y = Inf, label = paste("Mean:", round(mean_glucose, 2)), 
+           vjust = 2.5, color = "black", size = 3.5, angle = 0, hjust = -0.1) +
+  labs(title = "Density Plot for Glucose with Mean Value",
+       x = "Glucose Level",
+       y = "Density") +
+  theme_minimal()
+```
+
+```{r, include=TRUE}
+# Ящики с усами для Glucose по категориям Diabetes
+ggplot(pima_modified, aes(x = diabetes, y = glucose, fill = diabetes)) +
+  geom_boxplot() +
+  scale_fill_manual(values = c("pos" = "pink", "neg" = "lightblue")) +
+  labs(title = "Boxplots of Glucose for Diabetes Status",
+       x = "Diabetes Status",
+       y = "Glucose Level") +
+  theme_minimal()
+
+```
+
+### Задание 5
+
+Постройте на одном графике две диаграммы рассеяния для наличия или отсутствия диабета. По оси X представьте значения обхвата трицепса, а по оси Y — массу тела. Выполните окрашивание, заливку и группирование по переменной `diabetes`. — 3 балла
+
+#### *Переменные triceps* и *mass* *содержат нулевые значения, которые не могут соответствовать указанным параметрам. Поэтому не будем учитывать эти значения при построении* диаграммы рассеяния*.*
+
+#### *Построим два варианта графика, с расположением значений для двух групп с разным статусом диабета на одной плоскости и на двух рядом.*
+
+```{r, include=TRUE}
+# Подготовка данных, исключем нулевые значения triceps и mass
+# Удаляем один выброс (triceps = 99) для лучшей визуализации остальных значений
+  pima_modified_2 <- pima %>%
+    mutate(triceps = if_else(triceps == 0, NA_real_, triceps),
+         mass = if_else(mass == 0, NA_real_, mass)) %>%
+    drop_na() %>%
+  filter(triceps < 80)
+```
+
+```{r, include=TRUE}
+# Построение диаграмм рассеяния на одной пласкости 
+ggplot(pima_modified_2, aes(x = triceps, y = mass, color = diabetes, fill = diabetes)) +
+  geom_point(alpha = 0.5, shape = 21) + 
+  scale_color_manual(values = c("pos" = "red", "neg" = "blue")) +
+  scale_fill_manual(values = c("pos" = "red", "neg" = "blue")) + 
+  labs(title = "Scatter Plot by Diabetes Status",
+       x = "Triceps Circumference",
+       y = "Body Mass",
+       color = "Diabetes Status",
+       fill = "Diabetes Status") +
+  theme_minimal()
+```
+
+```{r, include=TRUE}
+
+# Построение графиков с помощью facet_grid(), как предложено в описании HW3
+ggplot(pima_modified_2, aes(x = triceps, y = mass, color = diabetes, fill = diabetes)) +
+  geom_point(alpha = 0.5, shape = 21) +
+  facet_grid(~ diabetes) +  # Разделяем график на панели по статусу diabetes
+  scale_color_manual(values = c("pos" = "red", "neg" = "blue")) +
+  scale_fill_manual(values = c("pos" = "red", "neg" = "blue")) +
+  labs(title = "Scatter Plots of Triceps Circumference vs. Body Mass by Diabetes Status",
+       x = "Triceps Circumference",
+       y = "Body Mass",
+       color = "Diabetes Status",
+       fill = "Diabetes Status") +
+  theme_minimal()
+```
